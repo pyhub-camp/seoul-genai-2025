@@ -1,43 +1,47 @@
 # Repository Guidelines
 
-## IMPORTANT
-
-- 항상 **한국어**로 대답해줘.
-
 ## Project Structure & Module Organization
-- `notes/`: Working notes and research (Markdown).
-- `specs/law.go.kr/`: API specifications and examples for 국가법령정보.
-- `GPTs/`: Prompt guides and GPT-facing docs.
-- `samples/api_openlaw/`: Prototype scripts and usage docs (Deno CLI prompt).
-- `.env.example`: Template for required environment variables; copy to `.env` locally.
+- Root docs: `PRD.md`, `GEMINI.md`, `notes/`, `GPTs/`, `specs/` (API specs, some in Korean).
+- Samples: `samples/api_openlaw/` contains Deno TypeScript CLI (`cli.ts`) and helper (`lib.ts`).
+- Environment: example at `.env.example` (do not commit real `.env`).
 
 ## Build, Test, and Development Commands
-- Docs: No build step. Edit Markdown and preview locally (e.g., VS Code preview).
-- Samples (when implemented): Use Deno.
-  - Run: `deno run -A path/to/script.ts --help`
-  - Env: Load variables from repo root `.env` (see Security).
+- Run OpenLaw CLI (list/detail):
+  - `deno run -A samples/api_openlaw/cli.ts law --query 119`
+  - `deno run -A samples/api_openlaw/cli.ts law --id 011349 --verbose`
+  - `deno run -A samples/api_openlaw/cli.ts admrul --query 교통 --output tmp/out.json`
+- Lint & format (Deno):
+  - `deno lint` — lint TypeScript in samples.
+  - `deno fmt` — apply formatting.
+- Cache deps: `deno cache samples/api_openlaw/*.ts`
 
 ## Coding Style & Naming Conventions
-- Markdown: One `#` H1 per file; use `##`/`###` for sections; fenced code blocks with language hints (` ```sh`, ` ```ts`).
-- Filenames: Prefer lowercase-hyphen English (e.g., `openlaw-guide.md`) or Korean titles as-is; avoid spaces; use `.md`.
-- Paths in docs: Root-relative (e.g., `specs/law.go.kr/현행법령본문조회.md`).
+- Language: TypeScript (Deno). Indent 2 spaces; keep semicolons.
+- Naming: `camelCase` for variables/functions, `PascalCase` for types, `UPPER_SNAKE_CASE` for const env keys.
+- Filenames: lowercase with short words (e.g., `cli.ts`, `lib.ts`). Markdown docs use clear titles; specs may use Korean filenames.
+- Imports: prefer versioned `deno.land/std` URLs.
 
 ## Testing Guidelines
-- Docs: Verify links render and examples run as shown. Include concrete command examples and expected outputs.
-- Samples: Provide a `README.md` alongside scripts with tested commands and real input examples; support `--verbose`, `--output`, and `--env-path` per `samples/api_openlaw/prompt.md`.
-- Coverage: Not enforced; aim for runnable examples that demonstrate core flows.
+- Framework: Deno built-in test runner.
+- Location: co-locate tests next to code as `*_test.ts` (e.g., `lib_test.ts`).
+- Run: `deno test -A` (add `--coverage=coverage` if needed).
+- Aim for focused unit tests of helpers in `samples/api_openlaw/`.
 
 ## Commit & Pull Request Guidelines
-- Conventional Commits style observed:
-  - Examples: `docs: Add API specs`, `feat(api_openlaw): 국가법령정보 API Deno CLI 구현`.
-  - Types: `feat`, `fix`, `docs`, `chore`, `refactor` (+ optional scope).
-- PRs must include: concise description, linked issues, what changed and why, screenshots/logs for CLI output when helpful, and check that `.env` is excluded.
+- Commits follow Conventional Commits:
+  - Examples: `feat(api_openlaw): add admrul detail`, `docs(specs): update 행정규칙목록조회`.
+- PRs include:
+  - Summary of changes and rationale, linked issue (if any).
+  - CLI examples or before/after snippets.
+  - Notes on docs/specs touched and any env/config needs.
 
 ## Security & Configuration Tips
-- Secrets: Never commit real keys. Use `.env` locally; keep `.env.example` updated.
-- Required vars: `OPEN_LAW_OC` (국가법령정보 API key). Scripts should error if missing or placeholder.
-- Config loading: Read repo-root `.env` by default; do not overwrite existing files; allow `--env-path` to augment.
+- Configure `OPEN_LAW_OC` in `.env` (see `.env.example`). Do not use placeholders like `test` in real runs.
+- Never commit secrets; `.gitignore` already excludes `.env*`.
+- Use `--output` to write large JSON to files to avoid terminal encoding issues.
 
 ## Agent-Specific Instructions
-- Write to the appropriate folder (`specs/`, `notes/`, `samples/`).
-- Do not modify `.env`; only read it. Always surface errors; do not hide failures.
+- Keep edits minimal and localized; do not reformat unrelated files.
+- Prefer Deno tools (`deno fmt/lint/test`) for TypeScript changes.
+- When adding samples, mirror existing patterns under `samples/` and update relevant docs in `notes/` or `specs/`.
+
