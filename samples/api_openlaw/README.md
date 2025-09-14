@@ -1,56 +1,76 @@
-# OpenLaw API 샘플 CLI (Deno)
+# 국가법령정보 API Deno CLI
 
-법령정보 OpenAPI를 사용한 간단한 CLI 샘플입니다. 검색과 상세 조회를 지원합니다.
+이 스크립트는 국가법령정보 Open API를 사용하여 행정규칙 및 현행법령의 목록과 본문을 조회하는 Deno CLI 도구입니다.
 
-## 준비
+## 사전 준비
 
-- Deno 설치 필요: https://deno.land
-- 리포지토리 루트에 `.env` 파일 생성 후 `OPEN_LAW_OC` 설정
+1.  **Deno 설치**: 이 스크립트를 실행하려면 [Deno](https://deno.land/)가 설치되어 있어야 합니다.
+2.  **API 인증키 설정**: 국가법령정보센터에서 발급받은 API 인증키가 필요합니다. 프로젝트 루트 경로(`.`)에 `.env` 파일을 생성하고 아래와 같이 `OPEN_LAW_OC` 값을 추가하세요.
 
+    ```.env
+    OPEN_LAW_OC=your_api_key_here
+    ```
+
+## 실행 권한
+
+스크립트를 처음 실행할 때 Deno는 환경 변수, 네트워크, 파일 읽기/쓰기 권한을 요청합니다. 아래 명령어를 사용하여 필요한 모든 권한을 부여하고 실행할 수 있습니다.
+
+```bash
+deno run --allow-env --allow-net --allow-read --allow-write samples/api_openlaw/cli.ts [명령] [인자]
 ```
-# ./.env (예시)
-OPEN_LAW_OC=your_issued_oc_here
-```
-
-> 주의: 실제 값은 저장소에 커밋하지 마세요. `.gitignore`에 의해 `.env*`는
-> 제외됩니다.
 
 ## 사용법
 
-명령은 저장소 루트에서 실행합니다.
-
 ```
-deno run -A samples/api_openlaw/cli.ts law --query 도로교통
-deno run -A samples/api_openlaw/cli.ts law --id 011349 --verbose
-deno run -A samples/api_openlaw/cli.ts admrul --query 교통 --output tmp/out.json
+cli.ts <type> [query] [options]
 ```
 
-옵션:
+### 인자 (Arguments)
 
-- `--query <텍스트>`: 목록 검색 질의어
-- `--id <ID_or_MST>`: 법령 상세 조회 (ID 우선, 실패 시 MST 재시도)
-- `--output <경로>`: 결과 JSON을 파일로 저장 (로그는 stderr)
-- `--env-path <경로>`: `.env` 대체 경로 지정 (기본: `./.env`)
-- `--verbose`: 디버그 정보 출력 (요청 URL, `.env` 경로 등)
+-   `<type>` (필수): 조회할 법령의 종류입니다.
+    -   `행정규칙`
+    -   `현행법령`
+-   `[query]` (`--id`가 없을 경우 필수): 검색할 단어입니다.
 
-## 인코딩 및 출력 팁
+### 옵션 (Options)
 
-- 일부 터미널에서 한글 출력이 깨질 수 있습니다. 큰 JSON은 `--output`으로 파일에
-  저장 후 편집기로 확인하세요.
+-   `--id <ID>`: 목록 조회 결과에서 얻은 `행정규칙ID` 또는 `법령ID`를 사용하여 해당 법령/규칙의 본문을 직접 조회합니다.
+-   `--output <file_path>`: 결과를 콘솔에 출력하는 대신 지정된 파일 경로에 저장합니다.
+-   `--verbose`: API 요청 URL, 원시 응답 등 상세한 디버깅 정보를 출력합니다.
+-   `--env-path <file_path>`: 기본 `.env` 파일 외에 추가적인 `.env` 파일을 로드합니다. 여기에 정의된 변수는 기본 값을 덮어씁니다.
 
-## 개발
+## 명령어 예시
 
-포맷/린트/캐시/테스트 명령:
+**참고**: 아래 예시에서 `your_api_key_here` 부분은 실제 발급받은 API 키로 대체해야 합니다.
 
-```
-deno fmt
-deno lint
-deno cache samples/api_openlaw/*.ts
-deno test -A
-```
+1.  **현행법령 목록 검색**
 
-## 참고
+    "도로교통법"을 포함하는 현행법령 목록을 검색합니다.
 
-- 법령 목록 검색: `http://www.law.go.kr/DRF/lawSearch.do?target=law`
-- 법령 본문 상세: `http://www.law.go.kr/DRF/lawService.do?target=law`
-- 행정규칙 목록 검색: `http://www.law.go.kr/DRF/lawSearch.do?target=admrul`
+    ```bash
+    deno run --allow-env --allow-net --allow-read samples/api_openlaw/cli.ts 현행법령 "도로교통법"
+    ```
+
+2.  **법령 본문 조회 (ID 사용)**
+
+    위 검색 결과에서 얻은 `법령ID` (`009682`)를 사용하여 "도로교통법"의 본문을 조회합니다.
+
+    ```bash
+    deno run --allow-env --allow-net --allow-read samples/api_openlaw/cli.ts 현행법령 --id 009682
+    ```
+
+3.  **행정규칙 목록 검색 결과를 파일로 저장**
+
+    "개인정보"를 포함하는 행정규칙을 검색하고, 결과를 `output.json` 파일로 저장합니다.
+
+    ```bash
+    deno run --allow-env --allow-net --allow-read --allow-write samples/api_openlaw/cli.ts 행정규칙 "개인정보" --output output.json
+    ```
+
+4.  **상세 정보와 함께 조회 (Verbose)**
+
+    API 요청 및 응답의 상세 정보를 함께 보려면 `--verbose` 옵션을 추가합니다.
+
+    ```bash
+    deno run --allow-env --allow-net --allow-read samples/api_openlaw/cli.ts 현행법령 "도로교통법" --verbose
+    ```

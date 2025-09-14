@@ -1,72 +1,82 @@
-# api_openlaw (Supabase Edge Function)
 
-OpenLaw D.R.F API를 Supabase Edge Function으로 포팅한 샘플입니다. 샘플 CLI(`samples/api_openlaw`) 코드를 참조하지 않고 필요한 헬퍼만 복사하여 구현했습니다.
+# Supabase Edge Function: 국가법령정보 API
 
-## 특징
-- 메서드: GET, OPTIONS만 지원 (POST 미지원)
-- 인증: 무인증(익명) 요청 허용, Authorization 헤더 미사용
-- 입력: 모든 인자는 쿼리 파라미터로만 전달 (URL 경로에 포함 금지)
-- 대용량 처리: `law.detail` 응답은 Storage `caches-bucket`에 JSON 저장 후 서명 URL만 반환
-- CORS: `Access-Control-Allow-Origin: *`, `GET, OPTIONS` 허용
+이 Edge Function은 국가법령정보 API를 통해 현행법령 및 행정규칙을 조회하는 웹 API를 제공합니다. GPTs Action 등 외부 서비스에서 쉽게 법령 정보를 검색하고 조회할 수 있도록 설계되었습니다.
 
-## 지원 액션 및 파라미터
-- `action=law.search` — 법령 검색
-  - `query`(필수), `display`(옵션), `page`(옵션)
-- `action=law.detail` — 법령 상세(본문)
-  - `idOrMst`(필수) — ID 또는 MST
-  - 본문 JSON은 Storage에 저장하고 `{ url: "<signed-url>" }` 형태로 응답
-- `action=admrul.search` — 행정규칙 검색
-  - `query`(필수), `display`(옵션), `page`(옵션)
+## API Endpoint
 
-## 예시 호출
-- `GET /api_openlaw?action=law.search&query=119`
-- `GET /api_openlaw?action=law.detail&idOrMst=011349`
-- `GET /api_openlaw?action=admrul.search&query=교통&page=1&display=20`
+`https://[your-project-ref].supabase.co/functions/v1/api_openlaw`
 
-## 환경 변수 (프로젝트 시크릿)
-Edge Functions 실행 환경에서 다음 변수를 설정해 주세요.
+## 요청 방식
 
-- `OPEN_LAW_OC`: OpenLaw API OC 키
-- `SUPABASE_URL`: 프로젝트 URL (예: https://xxxxxxxx.supabase.co)
-- `SUPABASE_SERVICE_ROLE_KEY`: Service Role 키 (서버 전용, 노출 금지)
+- **HTTP Method**: `GET`
+- **Query Parameters**:
+  - `type` (필수): 조회할 법령의 종류입니다.
+    - `law`: 현행법령
+    - `admrul`: 행정규칙
+  - `query` (목록 조회 시 필수): 검색할 키워드를 지정합니다.
+  - `id` (본문 조회 시 필수): 조회할 법령/행정규칙의 고유 ID를 지정합니다.
 
-> 주의: Service Role 키는 강력한 권한을 가지므로 클라이언트에 절대 노출하지 마세요. 본 함수는 서버 측에서만 사용합니다.
+### 예시
 
-## Storage 버킷
-- 버킷명: `caches-bucket`
-- 권장 설정: 비공개(Private)
-- 함수는 업로드 후 1시간 유효한 서명 URL을 생성하여 반환합니다.
-- 버킷은 대시보드(Storage)에서 생성해 주세요.
+- **법령 목록 검색 (도로교통법)**
+  ```
+  GET /api_openlaw?type=law&query=도로교통법
+  ```
 
-## Supabase 명령 안내 (인증/연결)
-> 함수에서 직접 인증을 수행하지 않습니다. 아래 명령을 사용자가 직접 실행해 주세요.
+- **법령 본문 조회 (ID: 001638)**
+  ```
+  GET /api_openlaw?type=law&id=001638
+  ```
 
-```sh
-npx supabase login
-npx supabase link --project-ref <project-id>
+## 응답 형식
+
+### 일반 응답 (100KB 미만)
+
+API 조회 결과가 100KB 미만일 경우, 국가법령정보 API의 응답 JSON을 그대로 반환합니다.
+
+```json
+{
+  "lawSearch": {
+    "target": "law",
+    "query": "도로교통법",
+    "totalCnt": 10,
+    "page": 1,
+    "law": [
+      // ... 법령 목록
+    ]
+  }
+}
 ```
 
-`<project-id>`는 Supabase 대시보드의 Project Settings에서 확인할 수 있습니다.
+### 대용량 응답 (100KB 이상)
 
-## 배포/로컬 실행
-```sh
-# (옵션) 로컬에서 함수 실행
-npx supabase functions serve api_openlaw
+API 응답(주로 법령 본문)이 100KB를 초과할 경우, 결과는 Supabase Storage `caches-bucket`에 JSON 파일로 저장되고, 해당 파일에 접근할 수 있는 URL을 담은 JSON 객체를 반환합니다.
 
-# 배포
-npx supabase functions deploy api_openlaw
+```json
+{
+  "type": "storage",
+  "url": "https://[ref].supabase.co/storage/v1/object/public/caches-bucket/law_001638.json",
+  "filename": "law_001638.json"
+}
 ```
 
-필요 시 프로젝트 시크릿 설정:
-```sh
-npx supabase secrets set OPEN_LAW_OC=... SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=...
-```
+## 배포 및 테스트
 
-## 구현 세부
-- OpenLaw 호출은 D.R.F(JSON) 엔드포인트를 사용합니다.
-- `law.detail` 저장 키는 요청 파라미터를 SHA-256 해시하여 `law_detail/<hash>.json`으로 저장합니다(중복 방지).
-- 에러가 발생하면 JSON `{ error, ...details }`로 응답합니다.
+1. **API 키 설정 (최초 1회)**:
+   국가법령정보센터에서 발급받은 API 키를 Supabase secret으로 설정합니다.
+   ```bash
+   npx supabase secrets set OPEN_LAW_OC=your_api_key_here
+   ```
 
-## 참고
-- 이 함수 코드는 `samples/api_openlaw/lib.ts`를 직접 참조하지 않고 필요한 부분만 복사하여 재구성했습니다.
-- Deno 표준 라이브러리는 버전 고정 URL(`deno.land/std@0.224.0`)로 사용했습니다.
+2. **Edge Function 배포**:
+   ```bash
+   npx supabase functions deploy api_openlaw
+   ```
+
+3. **테스트**:
+   배포 후 `curl` 명령어를 사용하여 API가 올바르게 동작하는지 확인할 수 있습니다.
+   ```bash
+   # 아래 [your-project-ref] 부분을 실제 Supabase 프로젝트의 ref ID로 변경하세요.
+   curl "https://[your-project-ref].supabase.co/functions/v1/api_openlaw?type=law&query=도로교통법"
+   ```
